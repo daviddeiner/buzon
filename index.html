@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Buzón Cupissa</title>
+<meta name="theme-color" content="#7c3aed"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Buzón Cupissa"><meta name="description" content="Buzón Cupissa: redacta y envía correos desde tu cuenta de Google.">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png" type="image/png"><link rel="apple-touch-icon" href="./icons/icon-192.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{--c:#7c3aed;--b:#e5e7eb;--t:#1f2937;--bg:#f6f5fb}
@@ -31,7 +33,7 @@ dialog{border:1px solid var(--b);border-radius:12px;max-width:480px;width:92%}di
 .chip{display:inline-block;background:#f3f0ff;border-radius:99px;padding:2px 8px;margin:2px;font-size:12px}
 </style></head><body>
 <header><h1>✉️ Buzón Cupissa</h1><span id="who" style="color:#6b7280"></span>
-<button id="bLogin" class="p" onclick="login()">Conectar con Google</button><button onclick="openCfg()">⚙️ Ajustes</button></header>
+<button id="bLogin" class="p" onclick="login()">Conectar con Google</button><button id="bInstall" onclick="installApp()">⬇ Descargar aplicación</button><button onclick="openCfg()">⚙️ Ajustes</button></header>
 <main>
 <section class="box"><h3>👥 Destinatarios <span id="cnt" class="chip">0</span></h3>
 <div class="row"><button onclick="loadClients()">Cargar clientes de Supabase</button></div>
@@ -77,6 +79,8 @@ dialog{border:1px solid var(--b);border-radius:12px;max-width:480px;width:92%}di
 <script>
 const $=s=>document.querySelector(s),ed=$('#ed'),sig=$('#sig'),dlg=$('#dlg');
 let cfg=JSON.parse(localStorage.getItem('cfg')||'{}'),tok=null,exp=0,tc=null,al=[],cl=[],sel=new Set(),rg=null,files=[],gr='',emoTarget='e';
+let deferredInstallPrompt=null;
+const SESSION_KEY='cupissa_buzon_oauth_session';
 const F=['gid','surl','skey','tbl','ecol','ncol','furl'];
 const PRE={'Blanco limpio':['#f4f4f7','','#ffffff'],'Rosa suave':['#ffe4ec','linear-gradient(135deg,#ffe4ec,#ffd1e0)','#ffffff'],'Noche':['#1b1340','linear-gradient(135deg,#14142b,#2d1b69)','#ffffff'],'Cálido':['#ffe9c7','linear-gradient(135deg,#fff4e0,#ffd9a8)','#fffdf8'],'Océano':['#cfeaff','linear-gradient(135deg,#e0f4ff,#b3e0ff)','#ffffff']};
 const EM='😀 😍 🥰 😎 🤩 🎉 🎁 🔥 ✨ ⭐ 💜 💖 👍 👏 🙌 💯 🛍️ 🛒 💸 🏷️ ⏰ 📣 📢 🚀 🌟 🍰 🎂 🍫 🌸 🌈 ☀️ 🎈 ❤️ ✅ 👉 📍 📞 💌 🎊 🏆'.split(' ');
@@ -88,15 +92,76 @@ function preset(){const p=PRE[$('#pre').value];$('#cbg').value=p[0];gr=p[1];$('#
 function logoUI(){$('#logo').innerHTML=cfg.logo?`<img src="${cfg.logo}">`:'<small style="color:#aaa">(Sube el logo en ⚙️ Ajustes)</small>'}
 function openCfg(){F.forEach(k=>$('#'+k).value=cfg[k]||'');dlg.showModal()}
 function small(file,max,cb){const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,max/i.width),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);cb(c.toDataURL(file.type=='image/png'?'image/png':'image/jpeg',.88))};i.src=r.result};r.readAsDataURL(file)}
-function saveCfg(){F.forEach(k=>cfg[k]=$('#'+k).value.trim());const f=$('#logof').files[0];const done=()=>{localStorage.setItem('cfg',JSON.stringify(cfg));logoUI();dlg.close()};f?small(f,500,d=>{cfg.logo=d;done()}):done()}
-/* ---- Google ---- */
-function login(){if(!cfg.gid)return openCfg();tc=google.accounts.oauth2.initTokenClient({client_id:cfg.gid,scope:'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic',callback:async r=>{if(r.error)return msg('Google: '+r.error);setTok(r);await loadAl()}});tc.requestAccessToken()}
-function setTok(r){tok=r.access_token;exp=Date.now()+r.expires_in*1000-60000}
-const getTok=()=>new Promise(res=>{if(tok&&Date.now()<exp)return res(tok);tc.callback=r=>{setTok(r);res(tok)};tc.requestAccessToken({prompt:''})});
-async function loadAl(){const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs',{headers:{Authorization:'Bearer '+tok}});const d=await r.json();if(!r.ok)return msg('Gmail: '+(d.error?.message||r.status));
-al=(d.sendAs||[]).filter(a=>a.isPrimary||a.verificationStatus==='accepted');$('#from').innerHTML=al.map((a,i)=>`<option value="${i}">${a.displayName?a.displayName+' — ':''}${a.sendAsEmail}</option>`).join('');$('#who').textContent=al.length+' alias disponibles';$('#bLogin').textContent='Conectado ✓';loadSig()}
-function loadSig(){const a=al[$('#from').value];if(!a)return;sig.innerHTML=localStorage.getItem('sig_'+a.sendAsEmail)??(a.signature||'')}
-sig.oninput=()=>{const a=al[$('#from').value];if(a)localStorage.setItem('sig_'+a.sendAsEmail,sig.innerHTML)};
+function saveCfg(){F.forEach(k=>cfg[k]=$('#'+k).value.trim());const f=$('#logof').files[0];const done=()=>{const oldId=JSON.parse(localStorage.getItem('cfg')||'{}').gid;if(oldId&&oldId!==cfg.gid)clearTok();localStorage.setItem('cfg',JSON.stringify(cfg));logoUI();dlg.close()};f?small(f,500,d=>{cfg.logo=d;done()}):done()}
+/* ---- Google: se conserva el token solamente en la sesión de esta pestaña.
+   Google exige una nueva autorización al caducar el token; NO guardar tokens Gmail
+   indefinidamente en localStorage. Para sesión permanente es necesario un backend OAuth. ---- */
+const GOOGLE_SCOPES='https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic';
+function readyGoogle(){return !!(window.google&&google.accounts&&google.accounts.oauth2)}
+function makeTokenClient(){
+  if(!cfg.gid||!readyGoogle())return null;
+  return google.accounts.oauth2.initTokenClient({client_id:cfg.gid,scope:GOOGLE_SCOPES,callback:()=>{}});
+}
+function setTok(r){
+  if(!r||!r.access_token||!Number.isFinite(Number(r.expires_in)))throw new Error('Respuesta de autorización inválida');
+  tok=r.access_token;exp=Date.now()+Number(r.expires_in)*1000-60000;
+  // sessionStorage sobrevive a recargas, pero no queda almacenado como credencial permanente.
+  try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({token:tok,expires:exp,clientId:cfg.gid}))}catch(_e){}
+}
+function clearTok(){
+  tok=null;exp=0;al=[];
+  try{sessionStorage.removeItem(SESSION_KEY)}catch(_e){}
+  $('#from').innerHTML='';$('#who').textContent='';$('#bLogin').textContent='Conectar con Google';
+}
+async function login(){
+  if(!cfg.gid)return openCfg();
+  tc=makeTokenClient();
+  if(!tc)return msg('Google aún no ha cargado. Comprueba tu conexión y vuelve a pulsar Conectar con Google.');
+  tc.callback=async r=>{
+    if(r.error||!r.access_token)return msg('Google: '+(r.error_description||r.error||'No se autorizó el acceso'));
+    try{setTok(r);await loadAl()}catch(e){clearTok();msg('No se pudo conectar con Google: '+e.message)}
+  };
+  tc.requestAccessToken({prompt:''});
+}
+function getTok(){
+  if(tok&&Date.now()<exp)return Promise.resolve(tok);
+  // La API de Google requiere una interacción del usuario para obtener otro token.
+  clearTok();
+  return Promise.reject(new Error('La autorización de Google venció. Pulsa «Conectar con Google» para continuar.'));
+}
+async function loadAl(){
+  if(!tok||Date.now()>=exp){clearTok();return}
+  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs',{headers:{Authorization:'Bearer '+tok}});
+  const d=await r.json();
+  if(!r.ok){if(r.status===401)clearTok();return msg('Gmail: '+(d.error?.message||r.status))}
+  al=(d.sendAs||[]).filter(a=>a.isPrimary||a.verificationStatus==='accepted');
+  $('#from').innerHTML=al.map((a,i)=>`<option value="${i}">${a.displayName?a.displayName+' — ':''}${a.sendAsEmail}</option>`).join('');
+  $('#who').textContent=al.length+' alias disponibles';
+  $('#bLogin').textContent='Google conectado ✓';
+  loadSig();
+}
+async function restoreSession(){
+  if(!cfg.gid)return;
+  try{
+    const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
+    if(!saved||saved.clientId!==cfg.gid||!saved.token||saved.expires<=Date.now()){clearTok();return}
+    tok=saved.token;exp=saved.expires;
+    await loadAl();
+  }catch(_e){clearTok()}
+}
+/* ---- Instalación PWA ---- */
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;$('#bInstall').textContent='⬇ Instalar aplicación'});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;$('#bInstall').textContent='✓ Aplicación instalada'});
+async function installApp(){
+  if(deferredInstallPrompt){
+    const promptEvent=deferredInstallPrompt;deferredInstallPrompt=null;
+    promptEvent.prompt();await promptEvent.userChoice;
+    return;
+  }
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  alert(ios?'Para instalar Buzón Cupissa en iPhone: abre esta página en Safari, toca Compartir y elige «Añadir a pantalla de inicio».':'Para instalar Buzón Cupissa: abre el menú del navegador (⋮) y selecciona «Instalar aplicación» o «Añadir a pantalla principal». La opción depende del navegador.');
+}
+if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 /* ---- Supabase ---- */
 async function loadClients(){if(!cfg.surl||!cfg.skey)return openCfg();let all=[],from=0;msg('Cargando clientes…');
 while(1){const r=await fetch(`${cfg.surl}/rest/v1/${cfg.tbl||'clientes'}?select=*`,{headers:{apikey:cfg.skey,Authorization:'Bearer '+cfg.skey,'Range-Unit':'items',Range:`${from}-${from+999}`}});
@@ -142,5 +207,5 @@ const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/sen
 if(r.ok)ok++;else{bad.push(c.e);if(r.status==429||r.status==403){msg('Límite de Gmail alcanzado. Enviados: '+ok);break}}}catch(e){bad.push(c.e)}
 await sleep(1200)}
 msg(`Listo ✓ ${ok} enviados`+(bad.length?`\n✗ Fallaron: ${bad.join(', ')}`:''))}
-logoUI();preset();if(!cfg.gid)openCfg();
+logoUI();preset();restoreSession();if(!cfg.gid)openCfg();
 </script></body></html>
