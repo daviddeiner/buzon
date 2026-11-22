@@ -1,0 +1,19 @@
+BUZÓN CUPISSA — ACTUALIZACIÓN
+
+1. Publicar TODOS los archivos del proyecto en la raíz de buzon.cupissa.com.
+   Incluir manifest.webmanifest, sw.js y la carpeta icons.
+2. Abrir https://buzon.cupissa.com en Chrome Android y pulsar «Descargar aplicación»;
+   en iPhone abrir en Safari y elegir Compartir > Añadir a pantalla de inicio.
+3. Mantener los orígenes JavaScript autorizados en Google Cloud para
+   https://buzon.cupissa.com (OAuth Client ID de aplicación web).
+4. El acceso Gmail se restaura automáticamente al RECARGAR LA MISMA PESTAÑA si
+   el token no venció. Al caducar o tras cerrar la sesión del navegador, Google
+   requiere pulsar «Conectar con Google» otra vez. No se guardan credenciales
+   permanentes en localStorage por seguridad. La sesión indefinida necesita
+   un backend OAuth que proteja refresh tokens en el servidor.
+5. Ninguna web puede ordenar a Gmail que coloque correos publicitarios en
+   «Principal» en vez de «Promociones». Para entregabilidad, confirmar SPF, DKIM
+   y DMARC en DNS del dominio remitente; usar mensajes relevantes y esperados,
+   respetar bajas y evitar campañas masivas a destinatarios sin consentimiento.
+   No se han quitado cabeceras de baja para intentar eludir los filtros.
+6. La PWA necesita Internet para enviar correos o cargar clientes.
