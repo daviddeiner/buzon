@@ -1,6 +1,6 @@
-// Caché únicamente de recursos públicos. Nunca cachear datos de Gmail ni Supabase.
-const CACHE='buzon-cupissa-shell-v1';
-const SHELL=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+// Caché únicamente de recursos públicos. Nunca cachear datos privados de Supabase.
+const CACHE='buzon-cupissa-shell-v6';
+const SHELL=['./','./index.html','./app.js','./logo.png','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
