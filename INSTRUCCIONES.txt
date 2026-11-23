@@ -1,19 +1,43 @@
-BUZÓN CUPISSA — ACTUALIZACIÓN
+BUZÓN CUPISSA — CORRECCIÓN DE CLIENTES, ASUNTO Y ENVÍO
 
-1. Publicar TODOS los archivos del proyecto en la raíz de buzon.cupissa.com.
-   Incluir manifest.webmanifest, sw.js y la carpeta icons.
-2. Abrir https://buzon.cupissa.com en Chrome Android y pulsar «Descargar aplicación»;
-   en iPhone abrir en Safari y elegir Compartir > Añadir a pantalla de inicio.
-3. Mantener los orígenes JavaScript autorizados en Google Cloud para
-   https://buzon.cupissa.com (OAuth Client ID de aplicación web).
-4. El acceso Gmail se restaura automáticamente al RECARGAR LA MISMA PESTAÑA si
-   el token no venció. Al caducar o tras cerrar la sesión del navegador, Google
-   requiere pulsar «Conectar con Google» otra vez. No se guardan credenciales
-   permanentes en localStorage por seguridad. La sesión indefinida necesita
-   un backend OAuth que proteja refresh tokens en el servidor.
-5. Ninguna web puede ordenar a Gmail que coloque correos publicitarios en
-   «Principal» en vez de «Promociones». Para entregabilidad, confirmar SPF, DKIM
-   y DMARC en DNS del dominio remitente; usar mensajes relevantes y esperados,
-   respetar bajas y evitar campañas masivas a destinatarios sin consentimiento.
-   No se han quitado cabeceras de baja para intentar eludir los filtros.
-6. La PWA necesita Internet para enviar correos o cargar clientes.
+1. Sube TODO el contenido de la carpeta buzon a tu repositorio de Buzón (sin modificar cupissa-admin). Asegúrate de incluir app.js, index.html y sw.js.
+
+2. Supabase Dashboard → proyecto de CUPISSA → Edge Functions → cupissa-buzon.
+   - Si no existe: Create a new function con nombre cupissa-buzon.
+   - Sustituye el contenido de index.ts por supabase/functions/cupissa-buzon/index.ts del ZIP.
+   - Despliega (Deploy).
+   - IMPORTANTE: la función debe existir en EL MISMO proyecto que usa Buzón.
+
+3. En Supabase → Edge Functions → Secrets verifica:
+   CUPISSA_ADMIN_EMAIL = contacto@cupissa.com
+   CUPISSA_MAILER_URL = URL HTTPS del servicio mailer usado por cupissa-emails
+   CUPISSA_MAILER_SECRET = el mismo secreto de cupissa-emails
+   SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY: valores del proyecto, configurados en el entorno de Edge Functions.
+   No escribas secretos dentro del HTML o JS público.
+
+4. Si la función está protegida por Verify JWT, utiliza una sesión vigente del administrador.
+   Se recomienda habilitar Verify JWT para la función. Además, el código verifica que el usuario Supabase Auth sea contacto@cupissa.com.
+
+5. Abre https://buzon.cupissa.com y actualiza con Ctrl+F5; cierra y reabre la PWA si estaba instalada. Inicia sesión.
+   Haz clic en «Cargar clientes de Supabase»: consulta clientes_web y clientes, mostrando los nombres y correos válidos y sin duplicados.
+   El asunto inicia vacío y solo se rellena si tú escribes en él.
+
+6. Antes del envío comercial, confirma que los destinatarios autorizaron comunicaciones comerciales.
+   Para probar, escribe un asunto, el contenido y usa «Enviarme prueba».
+   Si aparece Failed to fetch, el navegador no pudo obtener respuesta HTTP de la función: revisa despliegue, URL del proyecto, CORS, consola/red del navegador y extensiones que bloqueen peticiones. No significa que el proveedor haya rechazado el correo.
+   Si la función responde con HTTP y un error del mailer, revisa sus Secrets y los logs de Edge Functions.
+
+NOTA: En este entorno no se pudo realizar un envío real ni comprobar tu despliegue de producción. No se modifica cupissa-admin.
+
+ACTUALIZACIÓN DEL LOGO (23-11-2026)
+- logo.png está incluido en la raíz de Buzón y se muestra automáticamente en la vista previa y en todos los correos.
+- Publicar también logo.png junto a index.html y app.js. No hace falta subir el logo desde Ajustes.
+- El logo se referencia con una URL HTTPS absoluta en correos enviados; la página Buzón debe estar publicada y ser accesible públicamente para que se vea en los mensajes.
+- No es necesario volver a desplegar la Edge Function por este cambio visual.
+
+REVISIÓN LOGO Y EMOJIS (v6):
+- El logo se sube automáticamente desde logo.png al bucket público buzon-imagenes en el primer envío. No hay que subirlo desde Ajustes.
+- Supabase Storage requiere que buzon-imagenes exista y sea PUBLICO. La Edge Function cupissa-buzon incluida conserva upload_image.
+- El HTML convierte los caracteres no ASCII en entidades HTML numéricas para proteger emojis y tildes frente a alteraciones de codificación.
+- Clientes de correo pueden bloquear imágenes externas por privacidad; el correo incluye texto CUPISSA de respaldo.
+- Después de publicar, usa Ctrl+F5 o actualiza la PWA.
