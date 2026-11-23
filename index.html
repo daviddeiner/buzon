@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Buzón Cupissa</title>
-<meta name="theme-color" content="#7c3aed"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Buzón Cupissa"><meta name="description" content="Buzón Cupissa: redacta y envía correos desde tu cuenta de Google.">
+<meta name="theme-color" content="#7c3aed"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Buzón Cupissa"><meta name="description" content="Buzón Cupissa: campañas de correo con Supabase Edge Functions.">
 <link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png" type="image/png"><link rel="apple-touch-icon" href="./icons/icon-192.png">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root{--c:#7c3aed;--b:#e5e7eb;--t:#1f2937;--bg:#f6f5fb}
 *{box-sizing:border-box}body{margin:0;font:14px system-ui,Arial,sans-serif;color:var(--t);background:var(--bg)}
@@ -33,18 +33,18 @@ dialog{border:1px solid var(--b);border-radius:12px;max-width:480px;width:92%}di
 .chip{display:inline-block;background:#f3f0ff;border-radius:99px;padding:2px 8px;margin:2px;font-size:12px}
 </style></head><body>
 <header><h1>✉️ Buzón Cupissa</h1><span id="who" style="color:#6b7280"></span>
-<button id="bLogin" class="p" onclick="login()">Conectar con Google</button><button id="bInstall" onclick="installApp()">⬇ Descargar aplicación</button><button onclick="openCfg()">⚙️ Ajustes</button></header>
+<button id="bLogin" class="p" onclick="login()">Iniciar sesión de administrador</button><button id="bLogout" onclick="logout()" style="display:none">Cerrar sesión</button><button id="bInstall" onclick="installApp()">⬇ Descargar aplicación</button><button onclick="openCfg()">⚙️ Ajustes</button></header>
 <main>
-<section class="box"><h3>👥 Destinatarios <span id="cnt" class="chip">0</span></h3>
-<div class="row"><button onclick="loadClients()">Cargar clientes de Supabase</button></div>
+<section class="box"><h3>👥 Destinatarios <span id="cnt" class="chip">0 seleccionados / 0 correos cargados</span></h3>
+<div class="row"><button id="loadClientsBtn" onclick="loadClients()">Cargar clientes de Supabase</button></div>
 <input id="q" placeholder="Buscar nombre o correo…" oninput="renderClients()">
 <div class="row"><button onclick="selAll(1)">Todos</button><button onclick="selAll(0)">Ninguno</button></div>
 <div class="row"><input class="f" id="man" placeholder="Agregar un correo manual"><button onclick="addMan()">+</button></div>
 <div id="list"></div></section>
 
 <section class="box"><h3>✍️ Redactar</h3>
-<div class="row"><select class="f" id="from" onchange="loadSig()"></select></div>
-<div class="row"><input class="f" id="subj" placeholder="Asunto"><button onmousedown="event.preventDefault()" onclick="emoTarget='s';toggleEmo()">😀</button></div>
+<div class="row"><select class="f" id="from" onchange="loadSig()"><option value="0">CUPISSA — contacto@cupissa.com</option></select></div>
+<div class="row"><input class="f" id="subj" name="cupissa-campaign-subject" type="text" placeholder="Escribe el asunto del correo" autocomplete="off" autocapitalize="sentences" spellcheck="true" value=""><button onmousedown="event.preventDefault()" onclick="emoTarget='s';toggleEmo()">😀</button></div>
 <div class="tb" onmousedown="if(event.target.tagName!='SELECT'&&event.target.tagName!='INPUT')event.preventDefault()">
 <select onchange="cmd('fontName',this.value)"><option>Arial</option><option>Georgia</option><option>Verdana</option><option>Tahoma</option><option>Trebuchet MS</option><option>Times New Roman</option><option>Courier New</option></select>
 <select onchange="setSize(this.value)"><option value="">Tamaño</option><option>12</option><option>14</option><option>16</option><option>18</option><option>22</option><option>28</option><option>36</option><option>48</option></select>
@@ -64,158 +64,18 @@ dialog{border:1px solid var(--b);border-radius:12px;max-width:480px;width:92%}di
 <div id="stage"><div id="card"><div id="logo"></div><div id="ed" contenteditable="true"><h2 style="text-align:center">¡Hola {{nombre}}! 🎉</h2><p>Escribe aquí tu mensaje…</p></div><div id="sig" contenteditable="true"></div></div></div>
 <div class="row"><input type="file" id="fil" multiple onchange="addFiles(this)"><span id="fl"></span></div>
 <input type="file" id="imgf" accept="image/*" hidden onchange="addImg(this)">
-<div class="row"><button onclick="send(true)">🧪 Enviarme prueba</button><button class="p" onclick="send(false)">🚀 Enviar a seleccionados</button></div>
+<div class="row"><label style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="consent" style="width:auto">Confirmo que los destinatarios aceptaron recibir estos correos comerciales.</label></div><div class="row"><button id="testBtn" onclick="send(true)">🧪 Enviarme prueba</button><button id="sendBtn" class="p" onclick="send(false)">🚀 Enviar a seleccionados</button></div>
 <div id="msg"></div></section></main>
 
 <dialog id="dlg"><h3>⚙️ Ajustes (se guardan en este navegador)</h3>
-<label>Google OAuth Client ID</label><input id="gid">
-<label>Supabase URL</label><input id="surl" placeholder="https://xxxx.supabase.co">
-<label>Supabase anon key</label><input id="skey">
-<div class="row"><div style="flex:1"><label>Tabla</label><input id="tbl" placeholder="clientes"></div><div style="flex:1"><label>Col. correo</label><input id="ecol" placeholder="email"></div><div style="flex:1"><label>Col. nombre</label><input id="ncol" placeholder="nombre"></div></div>
+<p>Supabase está configurado con los datos públicos de CUPISSA. La contraseña no se guarda en los ajustes.</p>
+<label>Supabase URL</label><input id="surl" readonly>
+<label>Supabase anon key</label><input id="skey" readonly>
+<p>Los destinatarios se cargan mediante la Edge Function, sin exponer tablas privadas.</p>
 <label>URL de tu formulario (por defecto)</label><input id="furl" placeholder="https://…">
-<label>Logo de Cupissa</label><input type="file" id="logof" accept="image/*">
+<p>El logotipo oficial CUPISSA se muestra automáticamente al inicio de cada correo.</p>
 <div class="row" style="margin-top:12px"><button class="p" onclick="saveCfg()">Guardar</button><button onclick="dlg.close()">Cerrar</button></div></dialog>
 
-<script>
-const $=s=>document.querySelector(s),ed=$('#ed'),sig=$('#sig'),dlg=$('#dlg');
-let cfg=JSON.parse(localStorage.getItem('cfg')||'{}'),tok=null,exp=0,tc=null,al=[],cl=[],sel=new Set(),rg=null,files=[],gr='',emoTarget='e';
-let deferredInstallPrompt=null;
-const SESSION_KEY='cupissa_buzon_oauth_session';
-const F=['gid','surl','skey','tbl','ecol','ncol','furl'];
-const PRE={'Blanco limpio':['#f4f4f7','','#ffffff'],'Rosa suave':['#ffe4ec','linear-gradient(135deg,#ffe4ec,#ffd1e0)','#ffffff'],'Noche':['#1b1340','linear-gradient(135deg,#14142b,#2d1b69)','#ffffff'],'Cálido':['#ffe9c7','linear-gradient(135deg,#fff4e0,#ffd9a8)','#fffdf8'],'Océano':['#cfeaff','linear-gradient(135deg,#e0f4ff,#b3e0ff)','#ffffff']};
-const EM='😀 😍 🥰 😎 🤩 🎉 🎁 🔥 ✨ ⭐ 💜 💖 👍 👏 🙌 💯 🛍️ 🛒 💸 🏷️ ⏰ 📣 📢 🚀 🌟 🍰 🎂 🍫 🌸 🌈 ☀️ 🎈 ❤️ ✅ 👉 📍 📞 💌 🎊 🏆'.split(' ');
-const msg=t=>$('#msg').textContent=t,sleep=ms=>new Promise(r=>setTimeout(r,ms));
-$('#pre').innerHTML=Object.keys(PRE).map(k=>`<option>${k}</option>`).join('');
-$('#emo').innerHTML=EM.map(e=>`<span onmousedown="event.preventDefault()" onclick="putEmo('${e}')">${e}</span>`).join('');
-function style(){$('#stage').style.cssText=`background:${$('#cbg').value};${gr?'background-image:'+gr:''}`;$('#card').style.background=$('#ccd').value}
-function preset(){const p=PRE[$('#pre').value];$('#cbg').value=p[0];gr=p[1];$('#ccd').value=p[2];style()}
-function logoUI(){$('#logo').innerHTML=cfg.logo?`<img src="${cfg.logo}">`:'<small style="color:#aaa">(Sube el logo en ⚙️ Ajustes)</small>'}
-function openCfg(){F.forEach(k=>$('#'+k).value=cfg[k]||'');dlg.showModal()}
-function small(file,max,cb){const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,max/i.width),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);cb(c.toDataURL(file.type=='image/png'?'image/png':'image/jpeg',.88))};i.src=r.result};r.readAsDataURL(file)}
-function saveCfg(){F.forEach(k=>cfg[k]=$('#'+k).value.trim());const f=$('#logof').files[0];const done=()=>{const oldId=JSON.parse(localStorage.getItem('cfg')||'{}').gid;if(oldId&&oldId!==cfg.gid)clearTok();localStorage.setItem('cfg',JSON.stringify(cfg));logoUI();dlg.close()};f?small(f,500,d=>{cfg.logo=d;done()}):done()}
-/* ---- Google: se conserva el token solamente en la sesión de esta pestaña.
-   Google exige una nueva autorización al caducar el token; NO guardar tokens Gmail
-   indefinidamente en localStorage. Para sesión permanente es necesario un backend OAuth. ---- */
-const GOOGLE_SCOPES='https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.settings.basic';
-function readyGoogle(){return !!(window.google&&google.accounts&&google.accounts.oauth2)}
-function makeTokenClient(){
-  if(!cfg.gid||!readyGoogle())return null;
-  return google.accounts.oauth2.initTokenClient({client_id:cfg.gid,scope:GOOGLE_SCOPES,callback:()=>{}});
-}
-function setTok(r){
-  if(!r||!r.access_token||!Number.isFinite(Number(r.expires_in)))throw new Error('Respuesta de autorización inválida');
-  tok=r.access_token;exp=Date.now()+Number(r.expires_in)*1000-60000;
-  // sessionStorage sobrevive a recargas, pero no queda almacenado como credencial permanente.
-  try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({token:tok,expires:exp,clientId:cfg.gid}))}catch(_e){}
-}
-function clearTok(){
-  tok=null;exp=0;al=[];
-  try{sessionStorage.removeItem(SESSION_KEY)}catch(_e){}
-  $('#from').innerHTML='';$('#who').textContent='';$('#bLogin').textContent='Conectar con Google';
-}
-async function login(){
-  if(!cfg.gid)return openCfg();
-  tc=makeTokenClient();
-  if(!tc)return msg('Google aún no ha cargado. Comprueba tu conexión y vuelve a pulsar Conectar con Google.');
-  tc.callback=async r=>{
-    if(r.error||!r.access_token)return msg('Google: '+(r.error_description||r.error||'No se autorizó el acceso'));
-    try{setTok(r);await loadAl()}catch(e){clearTok();msg('No se pudo conectar con Google: '+e.message)}
-  };
-  tc.requestAccessToken({prompt:''});
-}
-function getTok(){
-  if(tok&&Date.now()<exp)return Promise.resolve(tok);
-  // La API de Google requiere una interacción del usuario para obtener otro token.
-  clearTok();
-  return Promise.reject(new Error('La autorización de Google venció. Pulsa «Conectar con Google» para continuar.'));
-}
-async function loadAl(){
-  if(!tok||Date.now()>=exp){clearTok();return}
-  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs',{headers:{Authorization:'Bearer '+tok}});
-  const d=await r.json();
-  if(!r.ok){if(r.status===401)clearTok();return msg('Gmail: '+(d.error?.message||r.status))}
-  al=(d.sendAs||[]).filter(a=>a.isPrimary||a.verificationStatus==='accepted');
-  $('#from').innerHTML=al.map((a,i)=>`<option value="${i}">${a.displayName?a.displayName+' — ':''}${a.sendAsEmail}</option>`).join('');
-  $('#who').textContent=al.length+' alias disponibles';
-  $('#bLogin').textContent='Google conectado ✓';
-  loadSig();
-}
-async function restoreSession(){
-  if(!cfg.gid)return;
-  try{
-    const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
-    if(!saved||saved.clientId!==cfg.gid||!saved.token||saved.expires<=Date.now()){clearTok();return}
-    tok=saved.token;exp=saved.expires;
-    await loadAl();
-  }catch(_e){clearTok()}
-}
-/* ---- Instalación PWA ---- */
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;$('#bInstall').textContent='⬇ Instalar aplicación'});
-window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;$('#bInstall').textContent='✓ Aplicación instalada'});
-async function installApp(){
-  if(deferredInstallPrompt){
-    const promptEvent=deferredInstallPrompt;deferredInstallPrompt=null;
-    promptEvent.prompt();await promptEvent.userChoice;
-    return;
-  }
-  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
-  alert(ios?'Para instalar Buzón Cupissa en iPhone: abre esta página en Safari, toca Compartir y elige «Añadir a pantalla de inicio».':'Para instalar Buzón Cupissa: abre el menú del navegador (⋮) y selecciona «Instalar aplicación» o «Añadir a pantalla principal». La opción depende del navegador.');
-}
-if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-/* ---- Firmas por dirección remitente ---- */
-function loadSig(){
-  const a=al[$('#from').value];
-  if(!a){sig.innerHTML='';return}
-  sig.innerHTML=localStorage.getItem('sig_'+a.sendAsEmail)??(a.signature||'');
-}
-sig.oninput=()=>{
-  const a=al[$('#from').value];
-  if(a)localStorage.setItem('sig_'+a.sendAsEmail,sig.innerHTML);
-};
-/* ---- Supabase ---- */
-async function loadClients(){if(!cfg.surl||!cfg.skey)return openCfg();let all=[],from=0;msg('Cargando clientes…');
-while(1){const r=await fetch(`${cfg.surl}/rest/v1/${cfg.tbl||'clientes'}?select=*`,{headers:{apikey:cfg.skey,Authorization:'Bearer '+cfg.skey,'Range-Unit':'items',Range:`${from}-${from+999}`}});
-if(!r.ok)return msg('Supabase: '+r.status+' '+await r.text());const d=await r.json();all=all.concat(d);if(d.length<1000)break;from+=1000}
-cl=all.map(c=>({e:(c[cfg.ecol||'email']||'').trim(),n:c[cfg.ncol||'nombre']||''})).filter(c=>c.e);msg(cl.length+' clientes cargados');renderClients()}
-function vis(){const q=$('#q').value.toLowerCase();return cl.filter(c=>(c.e+c.n).toLowerCase().includes(q))}
-function renderClients(){$('#list').innerHTML=vis().slice(0,500).map(c=>`<label><input type="checkbox" ${sel.has(c.e)?'checked':''} onchange="tg('${c.e.replace(/'/g,"\\'")}',this.checked)"><span>${c.n||'(sin nombre)'}<small>${c.e}</small></span></label>`).join('');$('#cnt').textContent=sel.size}
-function tg(e,v){v?sel.add(e):sel.delete(e);$('#cnt').textContent=sel.size}
-function selAll(v){vis().forEach(c=>v?sel.add(c.e):sel.delete(c.e));renderClients()}
-function addMan(){const e=$('#man').value.trim();if(!/\S+@\S+/.test(e))return;if(!cl.find(c=>c.e==e))cl.unshift({e,n:''});sel.add(e);$('#man').value='';renderClients()}
-/* ---- Editor ---- */
-const sv=()=>{const s=getSelection();if(s.rangeCount&&ed.contains(s.anchorNode))rg=s.getRangeAt(0)};
-['keyup','mouseup','focus'].forEach(e=>ed.addEventListener(e,sv));
-function rs(){ed.focus();if(rg){const s=getSelection();s.removeAllRanges();s.addRange(rg)}}
-function cmd(c,v){rs();document.execCommand('styleWithCSS',false,true);document.execCommand(c,false,v);sv()}
-function setSize(px){if(!px)return;rs();document.execCommand('styleWithCSS',false,false);document.execCommand('fontSize',false,7);ed.querySelectorAll('font[size="7"]').forEach(f=>{f.removeAttribute('size');f.style.fontSize=px+'px'});sv()}
-function bump(d){rs();const s=getSelection();let n=s.anchorNode;if(n&&n.nodeType==3)n=n.parentElement;setSize(Math.max(8,parseInt(getComputedStyle(n||ed).fontSize)+d))}
-function toggleEmo(){const e=$('#emo');e.style.display=e.style.display=='flex'?'none':'flex'}
-function putEmo(e){if(emoTarget=='s'){const i=$('#subj'),p=i.selectionStart??i.value.length;i.value=i.value.slice(0,p)+e+i.value.slice(p);i.focus()}else cmd('insertText',e)}
-function addLink(){const u=prompt('URL del enlace:','https://');if(u)cmd('createLink',u)}
-function addBtn(k){const t=prompt('Texto del botón:',k=='Formulario'?'Llenar formulario':'¡Compra ahora!');if(!t)return;const u=prompt('URL de destino:',k=='Formulario'?(cfg.furl||'https://'):'https://');if(!u)return;const c=prompt('Color del botón (hex):','#7c3aed')||'#7c3aed';
-cmd('insertHTML',`<div style="text-align:center;margin:18px 0"><a href="${u}" style="background:${c};color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">${t}</a></div><p><br></p>`)}
-function addImg(i){const f=i.files[0];if(f)small(f,900,d=>cmd('insertHTML',`<img src="${d}" style="max-width:100%;height:auto;border-radius:8px">`));i.value=''}
-function addFiles(i){[...i.files].forEach(f=>{const r=new FileReader();r.onload=()=>{files.push({name:f.name,type:f.type,data:r.result.split(',')[1]});$('#fl').textContent=files.map(x=>x.name).join(', ')};r.readAsDataURL(f)});i.value=''}
-/* ---- MIME / envío ---- */
-function enc(s){let r='';new TextEncoder().encode(s).forEach(x=>r+=String.fromCharCode(x));return btoa(r)}
-const wrap=b=>b.replace(/.{1,76}/g,'$&\r\n'),hdr=s=>/^[\x20-\x7e]*$/.test(s)?s:'=?UTF-8?B?'+enc(s)+'?=';
-function build(){const logo=cfg.logo?`<div style="text-align:center;padding-bottom:16px"><img src="${cfg.logo}" alt="Cupissa" style="max-width:180px;height:auto"></div>`:'';const bg=$('#cbg').value;
-return `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:${bg}"><table width="100%" cellpadding="0" cellspacing="0" bgcolor="${bg}" style="background-color:${bg};${gr?'background-image:'+gr:''}"><tr><td align="center" style="padding:24px 12px"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${$('#ccd').value};border-radius:12px"><tr><td style="padding:28px;font-family:Arial,sans-serif;color:#222;font-size:16px;line-height:1.5">${logo}${ed.innerHTML}<div style="margin-top:24px;border-top:1px solid #eee;padding-top:12px">${sig.innerHTML}</div></td></tr></table></td></tr></table></body></html>`}
-function prep(){const doc=new DOMParser().parseFromString(build(),'text/html'),inl=[];doc.querySelectorAll('img').forEach((im,i)=>{const m=/^data:([^;]+);base64,(.*)$/.exec(im.getAttribute('src')||'');if(m){const cid='i'+i+'@cupissa';inl.push({cid,type:m[1],data:m[2]});im.setAttribute('src','cid:'+cid)}});return{html:'<!doctype html>'+doc.documentElement.outerHTML,inl}}
-function mime(from,fe,to,subj,html,inl){const r=()=>Math.random().toString(36).slice(2),b1='m'+r(),b2='a'+r(),b3='r'+r(),txt=html.replace(/<style[\s\S]*?<\/style>/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
-let m=`From: ${from}\r\nTo: ${to}\r\nSubject: ${hdr(subj)}\r\nMIME-Version: 1.0\r\nList-Unsubscribe: <mailto:${fe}?subject=baja>\r\nContent-Type: multipart/mixed; boundary="${b1}"\r\n\r\n--${b1}\r\nContent-Type: multipart/alternative; boundary="${b2}"\r\n\r\n`;
-m+=`--${b2}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(enc(txt))}--${b2}\r\nContent-Type: multipart/related; boundary="${b3}"\r\n\r\n--${b3}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap(enc(html))}`;
-inl.forEach(i=>m+=`--${b3}\r\nContent-Type: ${i.type}\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <${i.cid}>\r\nContent-Disposition: inline\r\n\r\n${wrap(i.data)}`);
-m+=`--${b3}--\r\n--${b2}--\r\n`;files.forEach(a=>m+=`--${b1}\r\nContent-Type: ${a.type||'application/octet-stream'}; name="${hdr(a.name)}"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="${hdr(a.name)}"\r\n\r\n${wrap(a.data)}`);return m+`--${b1}--`}
-async function send(test){const a=al[$('#from').value];if(!a)return msg('Primero conecta con Google.');const subj=$('#subj').value.trim();if(!subj)return msg('Falta el asunto.');
-const to=test?[{e:a.sendAsEmail,n:'Prueba'}]:cl.filter(c=>sel.has(c.e));if(!to.length)return msg('Selecciona destinatarios.');
-if(!test&&!confirm(`Enviar a ${to.length} destinatario(s) desde ${a.sendAsEmail}?`))return;
-const{html,inl}=prep(),nm=(a.displayName||'').replace(/["<>,]/g,''),from=(nm?hdr(nm)+' ':'')+`<${a.sendAsEmail}>`;let ok=0,bad=[];
-for(const [i,c] of to.entries()){msg(`Enviando ${i+1}/${to.length}… (✓${ok} ✗${bad.length})`);
-try{const raw=btoa(mime(from,a.sendAsEmail,c.e,subj.replace(/{{nombre}}/g,c.n),html.replace(/{{nombre}}/g,c.n||''),inl)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{Authorization:'Bearer '+await getTok(),'Content-Type':'application/json'},body:JSON.stringify({raw})});
-if(r.ok)ok++;else{bad.push(c.e);if(r.status==429||r.status==403){msg('Límite de Gmail alcanzado. Enviados: '+ok);break}}}catch(e){bad.push(c.e)}
-await sleep(1200)}
-msg(`Listo ✓ ${ok} enviados`+(bad.length?`\n✗ Fallaron: ${bad.join(', ')}`:''))}
-logoUI();preset();restoreSession();if(!cfg.gid)openCfg();
-</script></body></html>
+<dialog id="authdlg"><h3>Acceso administrativo CUPISSA</h3><p>Usa el correo y la contraseña de tu administrador, sin conectar Gmail.</p><label>Correo</label><input id="authEmail" type="email" value="contacto@cupissa.com" readonly><label>Contraseña</label><input id="authPassword" type="password" autocomplete="current-password"><div class="row"><button class="p" onclick="loginPassword()">Entrar</button><button onclick="authdlg.close()">Cancelar</button></div><div id="authMsg" style="color:#b45309"></div></dialog>
+<script src="./app.js?v=6" defer></script>
+</body></html>
