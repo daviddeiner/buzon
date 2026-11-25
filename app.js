@@ -135,3 +135,34 @@ subjectInput.defaultValue = '';
 window.addEventListener('pageshow', event => {
   if (event.persisted) { subjectInput.value = ''; subjectInput.defaultValue = ''; }
 });
+
+/* Programación persistente: fecha explícitamente en UTC-05:00 (Colombia). */
+async function scheduleCampaign(){
+ if(sending)return;
+ const subject=$('#subj').value.trim(), date=$('#scheduleDate').value;
+ const recipients=cl.filter(c=>sel.has(c.e));
+ if(!subject||!recipients.length||!date)return msg('Completa asunto, destinatarios, fecha y hora.');
+ if(!$('#consent').checked)return msg('Confirma el consentimiento de los destinatarios.');
+ if(files.length)return msg('Retira los archivos adjuntos: el mailer actual no los admite.');
+ const at=new Date(date+'-05:00');
+ if(!Number.isFinite(at.getTime())||at<=new Date())return msg('Selecciona una fecha y hora futura de Colombia.');
+ if(!confirm(`Programar ${recipients.length} correo(s) para ${date.replace('T',' ')} (hora de Colombia)?`))return;
+ sending=true;$('#scheduleBtn').disabled=$('#sendBtn').disabled=$('#testBtn').disabled=true;
+ try{
+  const html=mailSafeUnicode(build(await ensurePublicMailLogo()));
+  const out=await edge('schedule_campaign',{subject,html,recipients,scheduled_at:at.toISOString(),campaign_id:crypto.randomUUID(),consent:true});
+  msg(`Envío programado: ${recipients.length} destinatarios. Puedes cerrar la aplicación.`);
+  await loadScheduled();
+ }catch(e){msg('No se pudo programar: '+e.message)}
+ finally{sending=false;$('#scheduleBtn').disabled=$('#sendBtn').disabled=$('#testBtn').disabled=false;}
+}
+async function loadScheduled(){
+ const list=$('#scheduledList');list.textContent='Consultando…';
+ try{const out=await edge('list_scheduled');list.replaceChildren();
+ for(const c of out.campaigns||[]){const item=document.createElement('div');item.style.cssText='padding:9px 0;border-bottom:1px solid #e5e7eb';
+ const title=document.createElement('strong');title.textContent=c.subject;item.append(title);
+ const details=document.createElement('div');details.textContent=new Date(c.scheduled_at).toLocaleString('es-CO',{timeZone:'America/Bogota',dateStyle:'medium',timeStyle:'short'})+` | Pendientes: ${c.pending} | En proceso: ${c.processing} | Aceptados: ${c.sent} | Errores: ${c.failed} | Cancelados: ${c.cancelled}`;item.append(details);
+ if(Number(c.pending)>0){const b=document.createElement('button');b.textContent='Cancelar pendientes';b.onclick=async()=>{if(!confirm('¿Cancelar los correos pendientes? Los que ya están en proceso no se pueden detener.'))return;try{await edge('cancel_scheduled',{campaign_id:c.id});await loadScheduled()}catch(e){msg(e.message)}};item.append(b)}list.append(item);}
+ if(!list.children.length)list.textContent='No hay mensajes programados.';
+ }catch(e){list.textContent='No se pudieron consultar: '+e.message;}
+}

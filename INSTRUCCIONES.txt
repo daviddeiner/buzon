@@ -41,3 +41,12 @@ REVISIÓN LOGO Y EMOJIS (v6):
 - El HTML convierte los caracteres no ASCII en entidades HTML numéricas para proteger emojis y tildes frente a alteraciones de codificación.
 - Clientes de correo pueden bloquear imágenes externas por privacidad; el correo incluye texto CUPISSA de respaldo.
 - Después de publicar, usa Ctrl+F5 o actualiza la PWA.
+
+PROGRAMACIÓN DE MENSAJES (v7) — configuración obligatoria una sola vez
+1. Ejecuta supabase/sql/01_programacion.sql en SQL Editor de Supabase.
+2. En Edge Functions → Secrets añade CUPISSA_BUZON_CRON_SECRET con una cadena aleatoria privada de al menos 32 caracteres. Conserva los secretos existentes.
+3. Actualiza y despliega cupissa-buzon con el index.ts incluido. Conserva la verificación JWT existente (el cron utiliza la clave anon JWT pública del proyecto y además exige el secreto privado).
+4. Abre supabase/sql/02_activar_cron.sql, copia al SQL Editor y reemplaza CAMBIA_ESTE_SECRETO por el mismo secreto del paso 2 (solo dentro de SQL Editor; nunca lo publiques). Ejecuta el SQL.
+5. Publica la web actualizada, sin subir secretos ni modificar otras aplicaciones. Actualiza con Ctrl+F5.
+6. Prueba seleccionando únicamente tu propio correo, confirma el consentimiento y programa un mensaje para unos minutos después. Cierra la web. Consulta luego Ver programados.
+La hora es Colombia (UTC-05:00). El cron revisa cada minuto y procesa hasta 10 correos por ejecución, en paralelo; campañas mayores continúan en minutos sucesivos. La recepción exacta depende del proveedor y no se garantiza al segundo. Los errores quedan registrados y no se reintentan automáticamente para evitar duplicados cuando no se conoce el resultado. Cancelar pendientes no cancela correos ya en proceso. La programación solo funciona tras configurar SQL, secreto y Edge Function. No se ha probado contra Supabase ni enviado correos reales.

@@ -88,8 +88,32 @@ Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (req.method !== 'POST') return json({ok:false,error:'Método no permitido'}, 405);
   try {
-    if (!await requireAdmin(req)) return json({ok:false,error:'Sesión de administrador no válida. Inicia sesión nuevamente.'},403);
     const body = await req.json();
+    if (body.action === 'run_scheduled') {
+      const secret = env('CUPISSA_BUZON_CRON_SECRET');
+      if (!secret || req.headers.get('x-buzon-cron-secret') !== secret) return json({ok:false,error:'No autorizado'},403);
+      const {data: jobs,error} = await adminDb.rpc('buzon_claim_scheduled');
+      if (error) throw error;
+      await Promise.all((jobs || []).map(async (j: any) => {
+        let status = 'sent', detail = null;
+        try { await deliver(j.email, personalize(j.subject,j.name), personalize(j.html,j.name), `buzon:${j.campaign_id}:${j.email}`); }
+        catch(e) { status='failed'; detail=String(e).slice(0,350); }
+        const {error: updateError} = await adminDb.from('buzon_scheduled_recipients').update({status,error:detail,finished_at:new Date().toISOString()}).eq('id',j.id).eq('status','processing');
+        if(updateError) console.error('scheduled status',updateError.message);
+      }));
+      return json({ok:true,processed:jobs?.length||0});
+    }
+    if (!await requireAdmin(req)) return json({ok:false,error:'Sesión de administrador no válida. Inicia sesión nuevamente.'},403);
+    if (body.action === 'list_scheduled') {
+      const {data,error}=await adminDb.rpc('buzon_list_scheduled');
+      if(error) throw error;
+      return json({ok:true,campaigns:data});
+    }
+    if (body.action === 'cancel_scheduled') {
+      const {error}=await adminDb.from('buzon_scheduled_recipients').update({status:'cancelled',finished_at:new Date().toISOString()}).eq('campaign_id',body.campaign_id).eq('status','pending');
+      if(error) throw error;
+      return json({ok:true});
+    }
     if (body.action === 'list_clients') return json({ ok: true, ...await listClients() });
     if (body.action === 'upload_image') {
       const raw = String(body.image || '');
@@ -107,9 +131,9 @@ Deno.serve(async req => {
       const {data:publicData} = adminDb.storage.from(bucket).getPublicUrl(key);
       return json({ok:true,url:publicData.publicUrl});
     }
-    if (body.action !== 'send_campaign') return json({ok:false,error:'Acción desconocida.'},400);
-    if (!Array.isArray(body.recipients) || body.recipients.length < 1 || body.recipients.length > 20)
-      return json({ok:false,error:'Envía de 1 a 20 destinatarios por lote.'},400);
+    if (!['send_campaign','schedule_campaign'].includes(body.action)) return json({ok:false,error:'Acción desconocida.'},400);
+    if (!Array.isArray(body.recipients) || body.recipients.length < 1 || body.recipients.length > (body.action === 'schedule_campaign' ? 100000 : 20))
+      return json({ok:false,error:'Cantidad de destinatarios fuera del límite permitido.'},400);
     if (typeof body.subject !== 'string' || !body.subject.trim() || body.subject.length > 250 || /[\r\n]/.test(body.subject))
       return json({ok:false,error:'Asunto no válido.'},400);
     if (typeof body.html !== 'string' || body.html.length < 1 || body.html.length > 140000)
@@ -124,6 +148,13 @@ Deno.serve(async req => {
       const e = safeText(c?.e).toLowerCase();
       if (!emailOK(e)) return json({ok:false,error:'Destinatario no válido.'},400);
       if (!unique.has(e)) {unique.add(e); recipients.push({e,n:safeText(c?.n) || 'Cliente'});}
+    }
+    if (body.action === 'schedule_campaign') {
+      const at = new Date(body.scheduled_at);
+      if (body.consent !== true || !Number.isFinite(at.getTime()) || at.getTime() <= Date.now()) return json({ok:false,error:'Fecha futura y consentimiento obligatorios.'},400);
+      const {error}=await adminDb.rpc('buzon_create_scheduled',{p_id:body.campaign_id,p_subject:body.subject,p_html:cleanHtml(body.html),p_at:at.toISOString(),p_recipients:recipients});
+      if(error) throw error;
+      return json({ok:true,id:body.campaign_id});
     }
     const errors: {email:string;error:string}[] = [];
     let sent = 0;

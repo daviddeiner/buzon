@@ -65,7 +65,7 @@ dialog{border:1px solid var(--b);border-radius:12px;max-width:480px;width:92%}di
 <div class="row"><input type="file" id="fil" multiple onchange="addFiles(this)"><span id="fl"></span></div>
 <input type="file" id="imgf" accept="image/*" hidden onchange="addImg(this)">
 <div class="row"><label style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="consent" style="width:auto">Confirmo que los destinatarios aceptaron recibir estos correos comerciales.</label></div><div class="row"><button id="testBtn" onclick="send(true)">🧪 Enviarme prueba</button><button id="sendBtn" class="p" onclick="send(false)">🚀 Enviar a seleccionados</button></div>
-<div id="msg"></div></section></main>
+<div class="box" style="margin-top:12px"><h3>Programar mensajes</h3><div class="row"><label for="scheduleDate">Fecha y hora (Colombia)</label><input id="scheduleDate" type="datetime-local" step="60"><button id="scheduleBtn" class="p" onclick="scheduleCampaign()">Programar envío</button><button onclick="loadScheduled()">Ver programados</button></div><div id="scheduledList" style="max-height:300px;overflow:auto" aria-live="polite"></div></div><div id="msg"></div></section></main>
 
 <dialog id="dlg"><h3>⚙️ Ajustes (se guardan en este navegador)</h3>
 <p>Supabase está configurado con los datos públicos de CUPISSA. La contraseña no se guarda en los ajustes.</p>
@@ -77,5 +77,5 @@ dialog{border:1px solid var(--b);border-radius:12px;max-width:480px;width:92%}di
 <div class="row" style="margin-top:12px"><button class="p" onclick="saveCfg()">Guardar</button><button onclick="dlg.close()">Cerrar</button></div></dialog>
 
 <dialog id="authdlg"><h3>Acceso administrativo CUPISSA</h3><p>Usa el correo y la contraseña de tu administrador, sin conectar Gmail.</p><label>Correo</label><input id="authEmail" type="email" value="contacto@cupissa.com" readonly><label>Contraseña</label><input id="authPassword" type="password" autocomplete="current-password"><div class="row"><button class="p" onclick="loginPassword()">Entrar</button><button onclick="authdlg.close()">Cancelar</button></div><div id="authMsg" style="color:#b45309"></div></dialog>
-<script src="./app.js?v=6" defer></script>
+<script src="./app.js?v=7" defer></script>
 </body></html>
